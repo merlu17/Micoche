@@ -3,47 +3,37 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Asistente Gemini</title>
+    <title>Test Gemini</title>
     <style>
-        body { background: #000; color: #fff; font-family: sans-serif; text-align: center; padding: 20px; }
-        .boton-gemini { 
-            background: #8e75ff; color: white; border: none; padding: 30px; 
-            border-radius: 20px; font-size: 2rem; font-weight: bold; width: 100%; margin-top: 20px;
-        }
-        #status { font-size: 1.5rem; color: #8e75ff; margin: 20px 0; min-height: 1.5em; }
+        body { background: #000; color: #fff; text-align: center; font-family: sans-serif; padding-top: 50px; }
+        #btn { background: #8e75ff; color: #fff; border: none; padding: 40px; border-radius: 20px; font-size: 1.5rem; width: 80%; }
+        #status { margin: 20px; font-size: 1.2rem; color: #aaa; }
     </style>
 </head>
 <body>
 
-    <div id="status">Toca el botón lila</div>
-    
-    <button class="boton-gemini" onclick="comenzar()">✨ HABLAR CON GEMINI</button>
+    <div id="status">Paso 1: Pulsa el botón</div>
+    <button id="btn" onclick="ejecutar()">✨ INICIAR ASISTENTE</button>
 
     <script>
         const API_KEY = "AIzaSyDAfXY-wpSJvTuflFIgyYI5eMbMOuaqF5E";
         
-        // 1. Configurar reconocimiento de voz
+        // Configuramos la voz fuera para que esté lista
         const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
         recognition.lang = 'es-ES';
 
-        function comenzar() {
-            // TRUCO: Decir una palabra muy corta para abrir el canal de audio del navegador
-            const abrirCanal = new SpeechSynthesisUtterance("Dime");
-            abrirCanal.volume = 0.1;
-            window.speechSynthesis.speak(abrirCanal);
-
+        async function ejecutar() {
             document.getElementById('status').innerText = "Escuchando...";
-            
             try {
                 recognition.start();
             } catch (e) {
-                console.log("Reconocimiento ya activo");
+                alert("Error al abrir micro: " + e.message);
             }
         }
 
         recognition.onresult = async (event) => {
             const texto = event.results[0][0].transcript;
-            document.getElementById('status').innerText = "Pensando...";
+            document.getElementById('status').innerText = "Gemini pensando...";
 
             try {
                 const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`, {
@@ -57,7 +47,7 @@
                 
                 hablar(respuestaIA);
             } catch (error) {
-                document.getElementById('status').innerText = "Error de red";
+                document.getElementById('status').innerText = "Error API: " + error;
             }
         };
 
@@ -66,16 +56,17 @@
             const lectura = new SpeechSynthesisUtterance(mensaje);
             lectura.lang = 'es-ES';
             
-            // Esto debería sonar solo porque ya "abrimos el canal" al principio
+            // Forzamos la voz
             window.speechSynthesis.speak(lectura);
             
             lectura.onend = () => {
-                document.getElementById('status').innerText = "Listo";
+                document.getElementById('status').innerText = "Terminado. Pulsa para repetir.";
             };
         }
 
-        recognition.onerror = () => {
-            document.getElementById('status').innerText = "Error: No te oigo";
+        recognition.onerror = (e) => {
+            document.getElementById('status').innerText = "Error: " + e.error;
+            if(e.error === 'not-allowed') alert("Debes dar permiso al micrófono en la barra de arriba del navegador");
         };
     </script>
 </body>
