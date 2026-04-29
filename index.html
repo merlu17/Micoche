@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gemini Car v6</title>
+    <title>Gemini Car v7</title>
     <style>
         body { background: #000; color: #fff; font-family: sans-serif; text-align: center; padding: 20px; }
         .btn-lila { 
             background: #8e75ff; color: white; border: none; padding: 35px; 
-            border-radius: 30px; font-size: 2rem; font-weight: bold; width: 100%;
+            border-radius: 30px; font-size: 2rem; font-weight: bold; width: 95%;
             box-shadow: 0 0 20px rgba(142, 117, 255, 0.5);
         }
         #info { margin-top: 20px; padding: 15px; background: #111; border-radius: 10px; font-size: 0.9rem; color: #8e75ff; min-height: 100px; border: 1px solid #333; overflow-wrap: break-word; }
@@ -16,13 +16,12 @@
 </head>
 <body>
 
-    <button class="btn-lila" onclick="run()">✨ HABLAR</button>
-    <div id="info">Pulsa para empezar</div>
+    <button class="btn-lila" onclick="run()">✨ HABLAR AHORA</button>
+    <div id="info">Estado: Listo para conectar</div>
 
     <script>
-        // CLAVE LIMPIADA AUTOMÁTICAMENTE
-        const LLAVE_SUCIA = "AIzaSyAgzM2hFd9prwA1-zNPR4a5GJ4GW0JRycU";
-        const MI_LLAVE = LLAVE_SUCIA.trim();
+        // TU NUEVA CLAVE RECIÉN GENERADA
+        const MI_LLAVE = "AIzaSyBBfJgTfk6vtBUqMZEgROCG4mKBgzZTpZg".trim();
 
         const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
         const rec = new Speech();
@@ -32,17 +31,19 @@
             window.speechSynthesis.cancel();
             const a = new SpeechSynthesisUtterance("Te escucho");
             window.speechSynthesis.speak(a);
-            document.getElementById('info').innerText = "Escuchando...";
-            a.onend = () => { rec.start(); };
+            document.getElementById('info').innerText = "🎤 Escuchando tu voz...";
+            a.onend = () => { 
+                try { rec.start(); } catch(e) { console.log(e); }
+            };
         }
 
         rec.onresult = async (e) => {
             const query = e.results[0][0].transcript;
             const caja = document.getElementById('info');
-            caja.innerText = "Pensando: " + query;
+            caja.innerText = "🧠 Gemini pensando: " + query;
 
             try {
-                // Forzamos la URL v1beta con la llave limpia
+                // Usamos v1beta que es la más compatible con claves nuevas
                 const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${MI_LLAVE}`;
                 
                 const response = await fetch(url, {
@@ -54,15 +55,14 @@
                 const json = await response.json();
 
                 if (json.error) {
-                    // Si falla, mostramos el código de error exacto para saber qué pasa
                     caja.innerHTML = `<b style="color:red">ERROR DE GOOGLE:</b><br>Código: ${json.error.code}<br>Mensaje: ${json.error.message}`;
                 } else {
                     const respuesta = json.candidates[0].content.parts[0].text;
-                    caja.innerText = "Respondiendo...";
+                    caja.innerText = "🔊 Respondiendo...";
                     decir(respuesta);
                 }
             } catch (err) {
-                caja.innerText = "Error de conexión: " + err;
+                caja.innerText = "❌ Error de conexión: " + err;
             }
         };
 
@@ -70,7 +70,7 @@
             const v = new SpeechSynthesisUtterance(txt);
             v.lang = 'es-ES';
             window.speechSynthesis.speak(v);
-            v.onend = () => { document.getElementById('info').innerText = "Listo. Toca para hablar de nuevo."; };
+            v.onend = () => { document.getElementById('info').innerText = "✅ Listo. Pulsa para otra pregunta."; };
         }
     </script>
 </body>
