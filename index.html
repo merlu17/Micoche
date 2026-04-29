@@ -3,69 +3,71 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gemini Auto</title>
+    <title>Gemini Car</title>
     <style>
         body { background: #000; color: #fff; font-family: sans-serif; text-align: center; padding: 20px; }
-        .boton { 
-            background: #8e75ff; color: white; border: none; padding: 35px; 
-            border-radius: 25px; font-size: 2rem; font-weight: bold; width: 100%;
-            margin-top: 20px;
+        .btn-lila { 
+            background: #8e75ff; color: white; border: none; padding: 40px; 
+            border-radius: 30px; font-size: 2rem; font-weight: bold; width: 90%;
+            box-shadow: 0 0 20px rgba(142, 117, 255, 0.5);
         }
-        #status { font-size: 1rem; color: #8e75ff; margin-top: 20px; background: #111; padding: 15px; border-radius: 10px; min-height: 50px; border: 1px solid #333; }
+        #info { margin-top: 20px; padding: 15px; background: #111; border-radius: 10px; font-size: 0.9rem; color: #8e75ff; min-height: 60px; border: 1px solid #333; }
     </style>
 </head>
 <body>
 
-    <div id="status">Listo para el coche</div>
-    <button class="boton" onclick="iniciar()">✨ HABLAR AHORA</button>
+    <button class="btn-lila" onclick="run()">✨ HABLAR</button>
+    <div id="info">Pulsa para empezar</div>
 
     <script>
-        // ESTA ES TU NUEVA CLAVE SIN ESPACIOS
-        const KEY = "AIzaSyAgzM2hFd9prwA1-zNPR4a5GJ4GW0JRycU";
-        
-        const speech = window.SpeechRecognition || window.webkitSpeechRecognition;
-        const recognition = new speech();
-        recognition.lang = 'es-ES';
+        // ESTA ES TU SEGUNDA CLAVE (Asegúrate de que no falte ni una letra)
+        const MI_LLAVE = "AIzaSyAgzM2hFd9prwA1-zNPR4a5GJ4GW0JRycU";
 
-        function iniciar() {
+        const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
+        const rec = new Speech();
+        rec.lang = 'es-ES';
+
+        function run() {
             window.speechSynthesis.cancel();
-            const t = new SpeechSynthesisUtterance("Te oigo");
-            window.speechSynthesis.speak(t);
-            document.getElementById('status').innerText = "Escuchando...";
-            t.onend = () => { recognition.start(); };
+            const a = new SpeechSynthesisUtterance("Dime");
+            window.speechSynthesis.speak(a);
+            document.getElementById('info').innerText = "Escuchando...";
+            a.onend = () => { rec.start(); };
         }
 
-        recognition.onresult = async (e) => {
-            const txt = e.results[0][0].transcript;
-            document.getElementById('status').innerText = "Enviando: " + txt;
+        rec.onresult = async (e) => {
+            const query = e.results[0][0].transcript;
+            document.getElementById('info').innerText = "Gemini pensando: " + query;
 
             try {
-                // URL corregida a v1beta
-                const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${KEY}`, {
+                // URL corregida a la versión estable 1.5-flash
+                const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" + MI_LLAVE;
+                
+                const response = await fetch(url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ contents: [{ parts: [{ text: txt }] }] })
+                    body: JSON.stringify({ contents: [{ parts: [{ text: query }] }] })
                 });
 
-                const res = await r.json();
+                const json = await response.json();
 
-                if (res.error) {
-                    document.getElementById('status').innerHTML = "<span style='color:red'>Error: " + res.error.message + "</span>";
+                if (json.error) {
+                    document.getElementById('info').innerHTML = "<b style='color:red'>ERROR: " + json.error.message + "</b>";
                 } else {
-                    const final = res.candidates[0].content.parts[0].text;
-                    hablar(final);
+                    const respuesta = json.candidates[0].content.parts[0].text;
+                    document.getElementById('info').innerText = "Respondiendo...";
+                    decir(respuesta);
                 }
             } catch (err) {
-                document.getElementById('status').innerText = "Error de red: " + err;
+                document.getElementById('info').innerText = "Error de conexión: " + err;
             }
         };
 
-        function hablar(msg) {
-            document.getElementById('status').innerText = "Respondiendo...";
-            const v = new SpeechSynthesisUtterance(msg);
+        function decir(txt) {
+            const v = new SpeechSynthesisUtterance(txt);
             v.lang = 'es-ES';
             window.speechSynthesis.speak(v);
-            v.onend = () => { document.getElementById('status').innerText = "Listo"; };
+            v.onend = () => { document.getElementById('info').innerText = "Listo"; };
         }
     </script>
 </body>
