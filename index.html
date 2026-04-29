@@ -1,73 +1,170 @@
-<!DOCTYPE html>
-<html lang="es">
+<!DOCTYPE html><html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gemini Car v10</title>
-    <style>
-        body { background: #000; color: #fff; font-family: sans-serif; text-align: center; padding: 20px; }
-        .btn-lila { 
-            background: #8e75ff; color: white; border: none; padding: 35px; 
-            border-radius: 30px; font-size: 2rem; font-weight: bold; width: 95%;
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gemini Car v11</title><style>
+body { 
+    background: #000; 
+    color: #fff; 
+    font-family: sans-serif; 
+    text-align: center; 
+    padding: 20px; 
+}
+
+.btn-lila { 
+    background: #8e75ff; 
+    color: white; 
+    border: none; 
+    padding: 35px; 
+    border-radius: 30px; 
+    font-size: 2rem; 
+    font-weight: bold; 
+    width: 95%;
+}
+
+#info { 
+    margin-top: 20px; 
+    padding: 15px; 
+    background: #111; 
+    border-radius: 10px; 
+    font-size: 0.9rem; 
+    color: #8e75ff; 
+    min-height: 100px; 
+    border: 1px solid #333; 
+    overflow-wrap: break-word; 
+}
+</style></head><body><button class="btn-lila" onclick="run()">✨ HABLAR AHORA</button>
+
+<div id="info">
+Estado: Listo para probar Gemini...
+</div><script>
+
+// ⚠️ PON TU NUEVA API KEY AQUÍ
+const MI_LLAVE = "PON_AQUI_TU_API_KEY";
+
+// Reconocimiento de voz
+const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+if (!Speech) {
+    document.getElementById('info').innerText =
+    "❌ Este navegador no soporta reconocimiento de voz.";
+}
+
+const rec = new Speech();
+rec.lang = 'es-ES';
+rec.interimResults = false;
+
+// Botón principal
+function run() {
+
+    window.speechSynthesis.cancel();
+
+    const saludo = new SpeechSynthesisUtterance("Te escucho");
+    saludo.lang = "es-ES";
+
+    document.getElementById('info').innerText =
+    "🎤 Preparando micrófono...";
+
+    window.speechSynthesis.speak(saludo);
+
+    saludo.onend = () => {
+        rec.start();
+        document.getElementById('info').innerText =
+        "🎤 Escuchando...";
+    };
+}
+
+// Cuando reconoce voz
+rec.onresult = async (e) => {
+
+    const query = e.results[0][0].transcript;
+
+    const caja = document.getElementById('info');
+
+    caja.innerText =
+    "🧠 Pensando: " + query;
+
+    try {
+
+        // ✅ MODELO ACTUAL FUNCIONAL
+        const url =
+        `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${MI_LLAVE}`;
+
+        const response = await fetch(url, {
+
+            method: 'POST',
+
+            headers: {
+                'Content-Type': 'application/json'
+            },
+
+            body: JSON.stringify({
+                contents: [{
+                    parts: [{
+                        text: query
+                    }]
+                }]
+            })
+
+        });
+
+        const json = await response.json();
+
+        if (json.error) {
+
+            caja.innerHTML =
+            `<b style="color:red">ERROR GOOGLE:</b><br>
+            Código: ${json.error.code}<br>
+            Mensaje: ${json.error.message}`;
+
+            return;
         }
-        #info { margin-top: 20px; padding: 15px; background: #111; border-radius: 10px; font-size: 0.9rem; color: #8e75ff; min-height: 100px; border: 1px solid #333; overflow-wrap: break-word; }
-    </style>
-</head>
-<body>
 
-    <button class="btn-lila" onclick="run()">✨ HABLAR AHORA</button>
-    <div id="info">Estado: Probando modelo universal...</div>
+        const respuesta =
+        json.candidates[0].content.parts[0].text;
 
-    <script>
-        const MI_LLAVE = "AIzaSyBBfJgTfk6vtBUqMZEgROCG4mKBgzZTpZg".trim();
+        caja.innerText =
+        "🔊 Respondiendo...";
 
-        const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
-        const rec = new Speech();
-        rec.lang = 'es-ES';
+        decir(respuesta);
 
-        function run() {
-            window.speechSynthesis.cancel();
-            const a = new SpeechSynthesisUtterance("Te escucho");
-            window.speechSynthesis.speak(a);
-            document.getElementById('info').innerText = "🎤 Escuchando...";
-            a.onend = () => { rec.start(); };
-        }
+    }
 
-        rec.onresult = async (e) => {
-            const query = e.results[0][0].transcript;
-            const caja = document.getElementById('info');
-            caja.innerText = "🧠 Pensando: " + query;
+    catch (err) {
 
-            try {
-                // MODELO UNIVERSAL: gemini-pro en v1beta
-                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${MI_LLAVE}`;
-                
-                const response = await fetch(url, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ contents: [{ parts: [{ text: query }] }] })
-                });
+        caja.innerText =
+        "❌ Error conexión: " + err;
 
-                const json = await response.json();
+    }
 
-                if (json.error) {
-                    caja.innerHTML = `<b style="color:red">ERROR DE GOOGLE:</b><br>Código: ${json.error.code}<br>Mensaje: ${json.error.message}`;
-                } else {
-                    const respuesta = json.candidates[0].content.parts[0].text;
-                    caja.innerText = "🔊 Respondiendo...";
-                    decir(respuesta);
-                }
-            } catch (err) {
-                caja.innerText = "❌ Error de conexión: " + err;
-            }
-        };
+};
 
-        function decir(txt) {
-            const v = new SpeechSynthesisUtterance(txt);
-            v.lang = 'es-ES';
-            window.speechSynthesis.speak(v);
-            v.onend = () => { document.getElementById('info').innerText = "✅ Listo."; };
-        }
-    </script>
-</body>
+// Hablar respuesta
+function decir(txt) {
+
+    const voz =
+    new SpeechSynthesisUtterance(txt);
+
+    voz.lang = 'es-ES';
+
+    window.speechSynthesis.speak(voz);
+
+    voz.onend = () => {
+
+        document.getElementById('info').innerText =
+        "✅ Listo.";
+
+    };
+
+}
+
+// Errores de micrófono
+rec.onerror = (e) => {
+
+    document.getElementById('info').innerText =
+    "❌ Error micrófono: " + e.error;
+
+};
+
+</script></body>
 </html>
