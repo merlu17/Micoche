@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gemini Car v8</title>
+    <title>Gemini Car v9</title>
     <style>
         body { background: #000; color: #fff; font-family: sans-serif; text-align: center; padding: 20px; }
         .btn-lila { 
@@ -17,10 +17,10 @@
 <body>
 
     <button class="btn-lila" onclick="run()">✨ HABLAR AHORA</button>
-    <div id="info">Estado: ¡Casi lo tenemos!</div>
+    <div id="info">Estado: Actualizando ruta...</div>
 
     <script>
-        // TU ÚLTIMA CLAVE (Asegúrate de que sea la que empieza por AIzaSyBBf...)
+        // TU CLAVE ACTUAL
         const MI_LLAVE = "AIzaSyBBfJgTfk6vtBUqMZEgROCG4mKBgzZTpZg".trim();
 
         const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -41,8 +41,8 @@
             caja.innerText = "🧠 Pensando: " + query;
 
             try {
-                // URL CORREGIDA: v1beta/models/gemini-1.5-flash
-                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${MI_LLAVE}`;
+                // CAMBIO CLAVE: Usamos la versión 'v1' y el modelo 'gemini-1.5-flash'
+                const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${MI_LLAVE}`;
                 
                 const response = await fetch(url, {
                     method: 'POST',
@@ -68,7 +68,7 @@
             const v = new SpeechSynthesisUtterance(txt);
             v.lang = 'es-ES';
             window.speechSynthesis.speak(v);
-            v.onend = () => { document.getElementById('info').innerText = "✅ Listo para más."; };
+            v.onend = () => { document.getElementById('info').innerText = "✅ Listo."; };
         }
     </script>
 </body>
