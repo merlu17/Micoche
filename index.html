@@ -2,95 +2,81 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Panel AA v4.5</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Asistente Gemini</title>
     <style>
-        :root { --bg: #000; --purple: #8e75ff; --blue: #1a73e8; }
-        body { font-family: sans-serif; background: var(--bg); color: white; text-align: center; margin: 0; padding: 20px; height: 100vh; display: flex; flex-direction: column; box-sizing: border-box; }
-        #status { font-size: 1.5rem; color: var(--purple); margin-bottom: 20px; height: 1.5em; }
-        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; flex-grow: 1; }
-        .boton { display: flex; align-items: center; justify-content: center; background: var(--blue); color: white; text-decoration: none; border-radius: 20px; font-size: 1.5rem; font-weight: bold; border: none; }
-        .gemini { background: var(--purple); grid-column: span 2; font-size: 2rem; }
-        .pulsar { animation: pulse 1s infinite; border: 4px solid white; }
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+        body { background: #000; color: #fff; font-family: sans-serif; text-align: center; padding: 20px; }
+        .boton-gemini { 
+            background: #8e75ff; color: white; border: none; padding: 30px; 
+            border-radius: 20px; font-size: 2rem; font-weight: bold; width: 100%; margin-top: 20px;
+        }
+        #status { font-size: 1.5rem; color: #8e75ff; margin: 20px 0; min-height: 1.5em; }
     </style>
 </head>
 <body>
 
-    <div id="status">Toca para hablar</div>
-
-    <div class="grid">
-        <a href="https://www.youtube.com" class="boton">YouTube</a>
-        <a href="https://www.google.es" class="boton">Google</a>
-        <a href="https://www.reddit.com" class="boton">Reddit</a>
-        <a href="https://www.eltiempo.es" class="boton">El Tiempo</a>
-        <button id="btnGemini" onclick="iniciar()" class="boton gemini">✨ GEMINI</button>
-    </div>
+    <div id="status">Toca el botón lila</div>
+    
+    <button class="boton-gemini" onclick="comenzar()">✨ HABLAR CON GEMINI</button>
 
     <script>
         const API_KEY = "AIzaSyDAfXY-wpSJvTuflFIgyYI5eMbMOuaqF5E";
-        let keepAliveInterval;
-
+        
+        // 1. Configurar reconocimiento de voz
         const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
         recognition.lang = 'es-ES';
 
-        function mantenerAudioVivo() {
-            // Reproduce un susurro vacío cada 2 segundos para que el navegador no cierre el canal
-            keepAliveInterval = setInterval(() => {
-                const snip = new SpeechSynthesisUtterance("");
-                snip.volume = 0;
-                window.speechSynthesis.speak(snip);
-            }, 2000);
-        }
+        function comenzar() {
+            // TRUCO: Decir una palabra muy corta para abrir el canal de audio del navegador
+            const abrirCanal = new SpeechSynthesisUtterance("Dime");
+            abrirCanal.volume = 0.1;
+            window.speechSynthesis.speak(abrirCanal);
 
-        function iniciar() {
-            window.speechSynthesis.cancel();
-            // Desbloqueo inicial
-            const ut = new SpeechSynthesisUtterance("Escuchando");
-            ut.volume = 0.1;
-            window.speechSynthesis.speak(ut);
+            document.getElementById('status').innerText = "Escuchando...";
             
-            document.getElementById('status').innerText = "🎤 Escuchando...";
-            document.getElementById('btnGemini').classList.add('pulsar');
-            recognition.start();
+            try {
+                recognition.start();
+            } catch (e) {
+                console.log("Reconocimiento ya activo");
+            }
         }
 
         recognition.onresult = async (event) => {
-            document.getElementById('btnGemini').classList.remove('pulsar');
             const texto = event.results[0][0].transcript;
-            document.getElementById('status').innerText = "🧠 Pensando...";
-            
-            mantenerAudioVivo(); // Empezamos a "bombardear" con silencios para mantener el permiso
+            document.getElementById('status').innerText = "Pensando...";
 
             try {
-                const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`, {
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ contents: [{ parts: [{ text: texto }] }] })
                 });
 
-                const data = await r.json();
-                const respuesta = data.candidates[0].content.parts[0].text;
+                const data = await response.json();
+                const respuestaIA = data.candidates[0].content.parts[0].text;
                 
-                clearInterval(keepAliveInterval); // Paramos los silencios
-                hablar(respuesta);
-            } catch (e) {
-                clearInterval(keepAliveInterval);
-                document.getElementById('status').innerText = "❌ Error";
+                hablar(respuestaIA);
+            } catch (error) {
+                document.getElementById('status').innerText = "Error de red";
             }
         };
 
-        function hablar(t) {
-            document.getElementById('status').innerText = "🔊 Hablando...";
-            const msg = new SpeechSynthesisUtterance(t);
-            msg.lang = 'es-ES';
+        function hablar(mensaje) {
+            document.getElementById('status').innerText = "Respondiendo...";
+            const lectura = new SpeechSynthesisUtterance(mensaje);
+            lectura.lang = 'es-ES';
             
-            // TRUCO FINAL: Forzar que el mensaje se procese como una respuesta directa al evento anterior
-            msg.onstart = () => { console.log("Empezó a hablar solo"); };
-            window.speechSynthesis.speak(msg);
+            // Esto debería sonar solo porque ya "abrimos el canal" al principio
+            window.speechSynthesis.speak(lectura);
             
-            msg.onend = () => { document.getElementById('status').innerText = "Listo"; };
+            lectura.onend = () => {
+                document.getElementById('status').innerText = "Listo";
+            };
         }
+
+        recognition.onerror = () => {
+            document.getElementById('status').innerText = "Error: No te oigo";
+        };
     </script>
 </body>
 </html>
