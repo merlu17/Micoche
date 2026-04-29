@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gemini Car v7</title>
+    <title>Gemini Car v8</title>
     <style>
         body { background: #000; color: #fff; font-family: sans-serif; text-align: center; padding: 20px; }
         .btn-lila { 
@@ -17,10 +17,10 @@
 <body>
 
     <button class="btn-lila" onclick="run()">✨ HABLAR AHORA</button>
-    <div id="info">Estado: Listo para conectar</div>
+    <div id="info">Estado: ¡Casi lo tenemos!</div>
 
     <script>
-        // TU NUEVA CLAVE RECIÉN GENERADA
+        // TU ÚLTIMA CLAVE (Asegúrate de que sea la que empieza por AIzaSyBBf...)
         const MI_LLAVE = "AIzaSyBBfJgTfk6vtBUqMZEgROCG4mKBgzZTpZg".trim();
 
         const Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -31,19 +31,17 @@
             window.speechSynthesis.cancel();
             const a = new SpeechSynthesisUtterance("Te escucho");
             window.speechSynthesis.speak(a);
-            document.getElementById('info').innerText = "🎤 Escuchando tu voz...";
-            a.onend = () => { 
-                try { rec.start(); } catch(e) { console.log(e); }
-            };
+            document.getElementById('info').innerText = "🎤 Escuchando...";
+            a.onend = () => { rec.start(); };
         }
 
         rec.onresult = async (e) => {
             const query = e.results[0][0].transcript;
             const caja = document.getElementById('info');
-            caja.innerText = "🧠 Gemini pensando: " + query;
+            caja.innerText = "🧠 Pensando: " + query;
 
             try {
-                // Usamos v1beta que es la más compatible con claves nuevas
+                // URL CORREGIDA: v1beta/models/gemini-1.5-flash
                 const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${MI_LLAVE}`;
                 
                 const response = await fetch(url, {
@@ -70,7 +68,7 @@
             const v = new SpeechSynthesisUtterance(txt);
             v.lang = 'es-ES';
             window.speechSynthesis.speak(v);
-            v.onend = () => { document.getElementById('info').innerText = "✅ Listo. Pulsa para otra pregunta."; };
+            v.onend = () => { document.getElementById('info').innerText = "✅ Listo para más."; };
         }
     </script>
 </body>
