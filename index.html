@@ -1,81 +1,142 @@
-<script>
-    const WORKER_URL = "https://shy-bird-e0a6.merlu17.workers.dev/";
-    const caja = document.getElementById("info");
-    const btn = document.getElementById("mainBtn");
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gemini Car v16</title>
+    <style>
+        body {
+            background: #000;
+            color: #fff;
+            font-family: sans-serif;
+            text-align: center;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+        }
 
-    async function run() {
-        // Detener cualquier voz previa
-        window.speechSynthesis.cancel();
+        .btn-lila {
+            background: #8e75ff;
+            color: white;
+            border: none;
+            padding: 40px;
+            border-radius: 30px;
+            font-size: 2rem;
+            font-weight: bold;
+            width: 90%;
+            max-width: 400px;
+            cursor: pointer;
+            box-shadow: 0 10px 20px rgba(142,117,255,0.3);
+        }
 
-        try {
-            // FORZAR SOLICITUD DE MICRO (Esto despierta al navegador)
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            
-            caja.innerHTML = "🎤 Micro detectado. Intentando reconocer...";
-            
-            // Si el stream funciona, intentamos el reconocimiento
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            
-            if (!SpeechRecognition) {
-                throw new Error("API SpeechRecognition no soportada en este navegador de AA.");
-            }
+        .btn-lila:active { transform: scale(0.95); }
 
-            const rec = new SpeechRecognition();
+        .listening { background: #ff4b4b !important; animation: pulse 1s infinite; }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(255, 75, 75, 0.7); }
+            70% { box-shadow: 0 0 0 20px rgba(255, 75, 75, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 75, 75, 0); }
+        }
+
+        #info {
+            margin-top: 20px;
+            padding: 20px;
+            background: #111;
+            border-radius: 15px;
+            width: 80%;
+            min-height: 100px;
+            border: 1px solid #333;
+            color: #8e75ff;
+            font-size: 1.1rem;
+        }
+    </style>
+</head>
+<body>
+
+    <button id="btn" class="btn-lila" onclick="run()">✨ HABLAR AHORA</button>
+
+    <div id="info">Estado: Listo</div>
+
+    <script>
+        const WORKER_URL = "https://shy-bird-e0a6.merlu17.workers.dev/";
+        const caja = document.getElementById("info");
+        const btn = document.getElementById("btn");
+
+        // Intentar detectar la API de voz
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        let rec = null;
+
+        if (SpeechRecognition) {
+            rec = new SpeechRecognition();
             rec.lang = "es-ES";
+            rec.continuous = false;
+            rec.interimResults = false;
 
             rec.onstart = () => {
-                btn.classList.add("escuchando");
+                btn.classList.add("listening");
                 btn.innerText = "🎤 ESCUCHANDO...";
+                caja.innerText = "Te escucho...";
             };
 
             rec.onresult = async (event) => {
                 const texto = event.results[0][0].transcript;
-                enviarAGemini(texto);
+                caja.innerText = "🧠 Pensando: " + texto;
+                procesar(texto);
             };
 
             rec.onerror = (e) => {
-                caja.innerHTML = "❌ Error: " + e.error + ". Puede que AA bloquee el micro.";
-                stopStream(stream);
+                caja.innerText = "❌ Error micro: " + e.error;
+                resetBtn();
             };
 
-            rec.onend = () => {
-                btn.classList.remove("escuchando");
-                btn.innerText = "✨ HABLAR";
-                stopStream(stream);
-            };
-
-            rec.start();
-
-        } catch (err) {
-            caja.innerHTML = "❌ Bloqueo total: " + err.message;
-            console.error(err);
+            rec.onend = () => { resetBtn(); };
         }
-    }
 
-    function stopStream(stream) {
-        stream.getTracks().forEach(track => track.stop());
-    }
-
-    async function enviarAGemini(texto) {
-        caja.innerHTML = "🧠 Pensando...";
-        try {
-            const response = await fetch(WORKER_URL, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ contents: [{ parts: [{ text: texto }] }] })
-            });
-            const data = await response.json();
-            const respuesta = data.candidates?.[0]?.content?.parts?.[0]?.text || "Sin respuesta";
-            caja.innerHTML = respuesta;
-            hablar(respuesta);
-        } catch (e) {
-            caja.innerHTML = "❌ Error Worker";
+        function resetBtn() {
+            btn.classList.remove("listening");
+            btn.innerText = "✨ HABLAR AHORA";
         }
-    }
 
-    function hablar(texto) {
-        const mensaje = new SpeechSynthesisUtterance(texto.replace(/[*#_~-]/g, ''));
-        mensaje.lang = "es-ES";
-        window.speechSynthesis.speak(mensaje);
-    }
-</script>
+        async function run() {
+            if (!rec) {
+                caja.innerText = "❌ Tu navegador no soporta voz.";
+                return;
+            }
+            window.speechSynthesis.cancel();
+            try {
+                rec.start();
+            } catch (e) {
+                console.log("Ya iniciado");
+            }
+        }
+
+        async function procesar(texto) {
+            try {
+                const response = await fetch(WORKER_URL, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ contents: [{ parts: [{ text: texto }] }] })
+                });
+                const data = await response.json();
+                const respuesta = data.candidates?.[0]?.content?.parts?.[0]?.text || "Sin respuesta";
+                
+                caja.innerText = respuesta;
+                hablar(respuesta);
+            } catch (error) {
+                caja.innerText = "❌ Error Worker: " + error.message;
+            }
+        }
+
+        function hablar(texto) {
+            const limpia = texto.replace(/[*#_~-]/g, '');
+            const msg = new SpeechSynthesisUtterance(limpia);
+            msg.lang = "es-ES";
+            window.speechSynthesis.speak(msg);
+        }
+    </script>
+</body>
+</html>
