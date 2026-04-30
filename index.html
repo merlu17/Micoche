@@ -1,186 +1,81 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gemini Car v16 AA Fix</title>
-    <style>
-        body {
-            background: #000;
-            color: #fff;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            text-align: center;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            margin: 0;
-            overflow: hidden;
-        }
+<script>
+    const WORKER_URL = "https://shy-bird-e0a6.merlu17.workers.dev/";
+    const caja = document.getElementById("info");
+    const btn = document.getElementById("mainBtn");
 
-        .btn-lila {
-            background: #8e75ff;
-            color: white;
-            border: none;
-            padding: 50px 20px;
-            border-radius: 40px;
-            font-size: 2.2rem;
-            font-weight: bold;
-            width: 90%;
-            max-width: 500px;
-            cursor: pointer;
-            box-shadow: 0 0 30px rgba(142, 117, 255, 0.4);
-            transition: all 0.2s ease;
-            -webkit-tap-highlight-color: transparent;
-        }
+    async function run() {
+        // Detener cualquier voz previa
+        window.speechSynthesis.cancel();
 
-        .btn-lila:active {
-            transform: scale(0.95);
-            background: #b1a1ff;
-            box-shadow: 0 0 50px rgba(142, 117, 255, 0.7);
-        }
+        try {
+            // FORZAR SOLICITUD DE MICRO (Esto despierta al navegador)
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            
+            caja.innerHTML = "🎤 Micro detectado. Intentando reconocer...";
+            
+            // Si el stream funciona, intentamos el reconocimiento
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            
+            if (!SpeechRecognition) {
+                throw new Error("API SpeechRecognition no soportada en este navegador de AA.");
+            }
 
-        .escuchando {
-            animation: pulse 1.5s infinite;
-            background: #ff4b4b !important;
-        }
-
-        @keyframes pulse {
-            0% { box-shadow: 0 0 0 0 rgba(255, 75, 75, 0.7); }
-            70% { box-shadow: 0 0 0 30px rgba(255, 75, 75, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(255, 75, 75, 0); }
-        }
-
-        #info {
-            margin-top: 30px;
-            padding: 25px;
-            background: #111;
-            border-radius: 20px;
-            font-size: 1.2rem;
-            color: #ccc;
-            width: 85%;
-            max-width: 500px;
-            min-height: 150px;
-            border: 2px solid #333;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            overflow-y: auto;
-        }
-
-        .status-dot {
-            height: 10px;
-            width: 10px;
-            background-color: #8e75ff;
-            border-radius: 50%;
-            display: inline-block;
-            margin-right: 10px;
-        }
-    </style>
-</head>
-<body>
-
-    <button id="mainBtn" class="btn-lila" onclick="run()">✨ HABLAR</button>
-
-    <div id="info">
-        <div><span class="status-dot"></span> Listo para escuchar</div>
-    </div>
-
-    <script>
-        const WORKER_URL = "https://shy-bird-e0a6.merlu17.workers.dev/";
-        const caja = document.getElementById("info");
-        const btn = document.getElementById("mainBtn");
-
-        // Intentar obtener la API de reconocimiento (varias versiones)
-        const SpeechRecognition = window.SpeechRecognition || 
-                                  window.webkitSpeechRecognition || 
-                                  window.mozSpeechRecognition || 
-                                  window.msSpeechRecognition;
-
-        let rec = null;
-
-        if (SpeechRecognition) {
-            rec = new SpeechRecognition();
+            const rec = new SpeechRecognition();
             rec.lang = "es-ES";
-            rec.continuous = false; // Importante para que se detenga al terminar de hablar
-            rec.interimResults = false;
 
             rec.onstart = () => {
                 btn.classList.add("escuchando");
                 btn.innerText = "🎤 ESCUCHANDO...";
-                caja.innerHTML = "Escuchando tu voz...";
             };
 
-            rec.onresult = async function(event) {
+            rec.onresult = async (event) => {
                 const texto = event.results[0][0].transcript;
-                caja.innerHTML = "🧠 <b>Pensando:</b> " + texto;
-                btn.classList.remove("escuchando");
-                btn.innerText = "⏳ PROCESANDO...";
-
-                try {
-                    const response = await fetch(WORKER_URL, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                            contents: [{ parts: [{ text: texto }] }]
-                        })
-                    });
-
-                    const data = await response.json();
-                    const respuesta = data.candidates?.[0]?.content?.parts?.[0]?.text || "Sin respuesta";
-
-                    caja.innerHTML = respuesta;
-                    hablar(respuesta);
-
-                } catch (error) {
-                    caja.innerHTML = "❌ Error: " + error.message;
-                    hablar("Error al conectar con Gemini");
-                } finally {
-                    resetBtn();
-                }
+                enviarAGemini(texto);
             };
 
             rec.onerror = (e) => {
-                console.error(e);
-                caja.innerHTML = "❌ Error Micro: " + e.error;
-                resetBtn();
+                caja.innerHTML = "❌ Error: " + e.error + ". Puede que AA bloquee el micro.";
+                stopStream(stream);
             };
 
             rec.onend = () => {
-                resetBtn();
+                btn.classList.remove("escuchando");
+                btn.innerText = "✨ HABLAR";
+                stopStream(stream);
             };
-        } else {
-            caja.innerHTML = "❌ Tu navegador no soporta Reconocimiento de Voz.";
-        }
 
-        function run() {
-            if (!rec) return;
-            // Detener voz si ya estaba hablando
-            window.speechSynthesis.cancel();
-            try {
-                rec.start();
-            } catch (e) {
-                // Si ya estaba iniciado, lo reiniciamos
-                rec.stop();
-                setTimeout(() => rec.start(), 200);
-            }
-        }
+            rec.start();
 
-        function resetBtn() {
-            btn.classList.remove("escuchando");
-            btn.innerText = "✨ HABLAR AHORA";
+        } catch (err) {
+            caja.innerHTML = "❌ Bloqueo total: " + err.message;
+            console.error(err);
         }
+    }
 
-        function hablar(texto) {
-            // Limpieza de símbolos Markdown para la voz
-            const textoLimpio = texto.replace(/[*#_~-]/g, '');
-            const mensaje = new SpeechSynthesisUtterance(textoLimpio);
-            mensaje.lang = "es-ES";
-            mensaje.rate = 1.1; 
-            window.speechSynthesis.speak(mensaje);
+    function stopStream(stream) {
+        stream.getTracks().forEach(track => track.stop());
+    }
+
+    async function enviarAGemini(texto) {
+        caja.innerHTML = "🧠 Pensando...";
+        try {
+            const response = await fetch(WORKER_URL, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ contents: [{ parts: [{ text: texto }] }] })
+            });
+            const data = await response.json();
+            const respuesta = data.candidates?.[0]?.content?.parts?.[0]?.text || "Sin respuesta";
+            caja.innerHTML = respuesta;
+            hablar(respuesta);
+        } catch (e) {
+            caja.innerHTML = "❌ Error Worker";
         }
-    </script>
-</body>
-</html>
+    }
+
+    function hablar(texto) {
+        const mensaje = new SpeechSynthesisUtterance(texto.replace(/[*#_~-]/g, ''));
+        mensaje.lang = "es-ES";
+        window.speechSynthesis.speak(mensaje);
+    }
+</script>
