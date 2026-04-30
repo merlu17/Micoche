@@ -3,140 +3,78 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gemini Car v16</title>
+    <title>Gemini Car v16 Fix</title>
     <style>
-        body {
-            background: #000;
-            color: #fff;
-            font-family: sans-serif;
-            text-align: center;
-            margin: 0;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-        }
-
-        .btn-lila {
-            background: #8e75ff;
-            color: white;
-            border: none;
-            padding: 40px;
-            border-radius: 30px;
-            font-size: 2rem;
-            font-weight: bold;
-            width: 90%;
-            max-width: 400px;
-            cursor: pointer;
-            box-shadow: 0 10px 20px rgba(142,117,255,0.3);
-        }
-
-        .btn-lila:active { transform: scale(0.95); }
-
-        .listening { background: #ff4b4b !important; animation: pulse 1s infinite; }
-
-        @keyframes pulse {
-            0% { box-shadow: 0 0 0 0 rgba(255, 75, 75, 0.7); }
-            70% { box-shadow: 0 0 0 20px rgba(255, 75, 75, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(255, 75, 75, 0); }
-        }
-
-        #info {
-            margin-top: 20px;
-            padding: 20px;
-            background: #111;
-            border-radius: 15px;
-            width: 80%;
-            min-height: 100px;
-            border: 1px solid #333;
-            color: #8e75ff;
-            font-size: 1.1rem;
-        }
+        body { background: #000; color: #fff; font-family: sans-serif; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+        .btn-lila { background: #8e75ff; color: white; border: none; padding: 40px; border-radius: 30px; font-size: 2rem; font-weight: bold; width: 90%; cursor: pointer; }
+        .recording { background: #ff4b4b !important; animation: pulse 1s infinite; }
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(255, 75, 75, 0.7); } 70% { box-shadow: 0 0 0 20px rgba(255, 75, 75, 0); } 100% { box-shadow: 0 0 0 0 rgba(255, 75, 75, 0); } }
+        #info { margin-top: 20px; padding: 20px; background: #111; border-radius: 15px; width: 80%; min-height: 100px; color: #8e75ff; border: 1px solid #333; }
     </style>
 </head>
 <body>
 
-    <button id="btn" class="btn-lila" onclick="run()">✨ HABLAR AHORA</button>
+<button id="btn" class="btn-lila" onclick="toggleRegistro()">✨ HABLAR</button>
+<div id="info">Estado: Listo</div>
 
-    <div id="info">Estado: Listo</div>
+<script>
+    let mediaRecorder;
+    let audioChunks = [];
+    const btn = document.getElementById("btn");
+    const caja = document.getElementById("info");
 
-    <script>
-        const WORKER_URL = "https://shy-bird-e0a6.merlu17.workers.dev/";
-        const caja = document.getElementById("info");
-        const btn = document.getElementById("btn");
+    async function toggleRegistro() {
+        if (mediaRecorder && mediaRecorder.state === "recording") {
+            mediaRecorder.stop();
+            btn.classList.remove("recording");
+            btn.innerText = "⏳ PROCESANDO...";
+            return;
+        }
 
-        // Intentar detectar la API de voz
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        let rec = null;
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorder = new MediaRecorder(stream);
+            audioChunks = [];
 
-        if (SpeechRecognition) {
-            rec = new SpeechRecognition();
-            rec.lang = "es-ES";
-            rec.continuous = false;
-            rec.interimResults = false;
-
-            rec.onstart = () => {
-                btn.classList.add("listening");
-                btn.innerText = "🎤 ESCUCHANDO...";
-                caja.innerText = "Te escucho...";
+            mediaRecorder.ondataavailable = (event) => {
+                audioChunks.push(event.data);
             };
 
-            rec.onresult = async (event) => {
-                const texto = event.results[0][0].transcript;
-                caja.innerText = "🧠 Pensando: " + texto;
-                procesar(texto);
+            mediaRecorder.onstop = async () => {
+                const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                caja.innerText = "🧠 Enviando audio a Gemini...";
+                // Aquí enviarías el audio al Worker
+                enviarAudio(audioBlob);
             };
 
-            rec.onerror = (e) => {
-                caja.innerText = "❌ Error micro: " + e.error;
-                resetBtn();
-            };
+            mediaRecorder.start();
+            btn.classList.add("recording");
+            btn.innerText = "🛑 DETENER";
+            caja.innerText = "Escuchando... pulsa para terminar.";
 
-            rec.onend = () => { resetBtn(); };
+        } catch (err) {
+            caja.innerText = "❌ Error: " + err.message;
         }
+    }
 
-        function resetBtn() {
-            btn.classList.remove("listening");
-            btn.innerText = "✨ HABLAR AHORA";
-        }
+    async function enviarAudio(blob) {
+        // NOTA: Tu worker actual espera TEXTO. 
+        // Si no puedes cambiar el worker a transcripción de audio,
+        // intentemos forzar el reconocimiento nativo una última vez con este parche:
+        forzarReconocimientoNativo();
+    }
 
-        async function run() {
-            if (!rec) {
-                caja.innerText = "❌ Tu navegador no soporta voz.";
-                return;
-            }
-            window.speechSynthesis.cancel();
-            try {
-                rec.start();
-            } catch (e) {
-                console.log("Ya iniciado");
-            }
-        }
-
-        async function procesar(texto) {
-            try {
-                const response = await fetch(WORKER_URL, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ contents: [{ parts: [{ text: texto }] }] })
-                });
-                const data = await response.json();
-                const respuesta = data.candidates?.[0]?.content?.parts?.[0]?.text || "Sin respuesta";
-                
-                caja.innerText = respuesta;
-                hablar(respuesta);
-            } catch (error) {
-                caja.innerText = "❌ Error Worker: " + error.message;
-            }
-        }
-
-        function hablar(texto) {
-            const limpia = texto.replace(/[*#_~-]/g, '');
-            const msg = new SpeechSynthesisUtterance(limpia);
-            msg.lang = "es-ES";
-            window.speechSynthesis.speak(msg);
-        }
-    </script>
+    function forzarReconocimientoNativo() {
+        const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+        recognition.lang = "es-ES";
+        recognition.onstart = () => { console.log("Iniciado"); };
+        recognition.onresult = (event) => {
+            const texto = event.results[0][0].transcript;
+            caja.innerText = "Texto: " + texto;
+            // llamar a tu función de fetch aquí
+        };
+        recognition.start();
+    }
+</script>
 </body>
 </html>
