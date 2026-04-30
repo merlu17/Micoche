@@ -4,142 +4,181 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gemini Car v16 AA Fix</title>
-
     <style>
         body {
             background: #000;
             color: #fff;
-            font-family: sans-serif;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             text-align: center;
             padding: 20px;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            height: 90vh;
+            height: 100vh;
             margin: 0;
+            overflow: hidden;
         }
 
         .btn-lila {
             background: #8e75ff;
             color: white;
             border: none;
-            padding: 35px;
-            border-radius: 30px;
-            font-size: 2rem;
+            padding: 50px 20px;
+            border-radius: 40px;
+            font-size: 2.2rem;
             font-weight: bold;
-            width: 95%;
+            width: 90%;
+            max-width: 500px;
             cursor: pointer;
-            transition: transform 0.1s;
-            box-shadow: 0 10px 20px rgba(142, 117, 255, 0.3);
+            box-shadow: 0 0 30px rgba(142, 117, 255, 0.4);
+            transition: all 0.2s ease;
+            -webkit-tap-highlight-color: transparent;
         }
 
         .btn-lila:active {
             transform: scale(0.95);
-            background: #7a62e6;
+            background: #b1a1ff;
+            box-shadow: 0 0 50px rgba(142, 117, 255, 0.7);
+        }
+
+        .escuchando {
+            animation: pulse 1.5s infinite;
+            background: #ff4b4b !important;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(255, 75, 75, 0.7); }
+            70% { box-shadow: 0 0 0 30px rgba(255, 75, 75, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 75, 75, 0); }
         }
 
         #info {
             margin-top: 30px;
-            padding: 20px;
+            padding: 25px;
             background: #111;
-            border-radius: 15px;
-            font-size: 1.1rem;
-            color: #8e75ff;
+            border-radius: 20px;
+            font-size: 1.2rem;
+            color: #ccc;
             width: 85%;
-            min-height: 120px;
-            border: 1px solid #333;
+            max-width: 500px;
+            min-height: 150px;
+            border: 2px solid #333;
             display: flex;
             align-items: center;
             justify-content: center;
-            line-height: 1.4;
+            overflow-y: auto;
+        }
+
+        .status-dot {
+            height: 10px;
+            width: 10px;
+            background-color: #8e75ff;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 10px;
         }
     </style>
 </head>
-
 <body>
 
-    <button class="btn-lila" onclick="run()">✨ HABLAR AHORA</button>
+    <button id="mainBtn" class="btn-lila" onclick="run()">✨ HABLAR</button>
 
-    <div id="info">Estado: Listo</div>
+    <div id="info">
+        <div><span class="status-dot"></span> Listo para escuchar</div>
+    </div>
 
     <script>
         const WORKER_URL = "https://shy-bird-e0a6.merlu17.workers.dev/";
+        const caja = document.getElementById("info");
+        const btn = document.getElementById("mainBtn");
 
-        // Configuración de Reconocimiento de Voz
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        // Intentar obtener la API de reconocimiento (varias versiones)
+        const SpeechRecognition = window.SpeechRecognition || 
+                                  window.webkitSpeechRecognition || 
+                                  window.mozSpeechRecognition || 
+                                  window.msSpeechRecognition;
+
         let rec = null;
 
         if (SpeechRecognition) {
             rec = new SpeechRecognition();
             rec.lang = "es-ES";
+            rec.continuous = false; // Importante para que se detenga al terminar de hablar
             rec.interimResults = false;
-            rec.maxAlternatives = 1;
+
+            rec.onstart = () => {
+                btn.classList.add("escuchando");
+                btn.innerText = "🎤 ESCUCHANDO...";
+                caja.innerHTML = "Escuchando tu voz...";
+            };
 
             rec.onresult = async function(event) {
                 const texto = event.results[0][0].transcript;
-                const caja = document.getElementById("info");
-
-                caja.innerText = "🧠 Pensando: " + texto;
+                caja.innerHTML = "🧠 <b>Pensando:</b> " + texto;
+                btn.classList.remove("escuchando");
+                btn.innerText = "⏳ PROCESANDO...";
 
                 try {
                     const response = await fetch(WORKER_URL, {
                         method: "POST",
-                        headers: {
-                            "Content-Type": "application/json"
-                        },
+                        headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({
-                            contents: [{
-                                parts: [{
-                                    text: texto
-                                }]
-                            }]
+                            contents: [{ parts: [{ text: texto }] }]
                         })
                     });
 
                     const data = await response.json();
-                    const respuesta = data.candidates?.[0]?.content?.parts?.[0]?.text || "No recibí respuesta.";
+                    const respuesta = data.candidates?.[0]?.content?.parts?.[0]?.text || "Sin respuesta";
 
-                    caja.innerText = respuesta;
+                    caja.innerHTML = respuesta;
                     hablar(respuesta);
 
                 } catch (error) {
-                    caja.innerText = "❌ Error en la conexión: " + error.message;
-                    hablar("Lo siento, hubo un error de conexión.");
+                    caja.innerHTML = "❌ Error: " + error.message;
+                    hablar("Error al conectar con Gemini");
+                } finally {
+                    resetBtn();
                 }
             };
 
-            rec.onerror = function(e) {
-                document.getElementById("info").innerText = "❌ Error micrófono: " + e.error;
+            rec.onerror = (e) => {
+                console.error(e);
+                caja.innerHTML = "❌ Error Micro: " + e.error;
+                resetBtn();
             };
 
-            rec.onend = function() {
-                // Se detuvo la escucha
+            rec.onend = () => {
+                resetBtn();
             };
+        } else {
+            caja.innerHTML = "❌ Tu navegador no soporta Reconocimiento de Voz.";
         }
 
-        // Función para iniciar la escucha
         function run() {
-            if (rec) {
-                // Detener cualquier voz que esté hablando antes de escuchar
-                window.speechSynthesis.cancel();
-                document.getElementById("info").innerText = "🎤 Escuchando...";
+            if (!rec) return;
+            // Detener voz si ya estaba hablando
+            window.speechSynthesis.cancel();
+            try {
                 rec.start();
-            } else {
-                alert("Tu navegador o dispositivo no soporta el reconocimiento de voz.");
+            } catch (e) {
+                // Si ya estaba iniciado, lo reiniciamos
+                rec.stop();
+                setTimeout(() => rec.start(), 200);
             }
         }
 
-        // Función para que la IA hable
+        function resetBtn() {
+            btn.classList.remove("escuchando");
+            btn.innerText = "✨ HABLAR AHORA";
+        }
+
         function hablar(texto) {
-            // Limpiar Markdown (asteriscos, almohadillas, etc.) para que la voz sea fluida
-            const textoLimpio = texto.replace(/[*#_~]/g, '');
-            
+            // Limpieza de símbolos Markdown para la voz
+            const textoLimpio = texto.replace(/[*#_~-]/g, '');
             const mensaje = new SpeechSynthesisUtterance(textoLimpio);
             mensaje.lang = "es-ES";
-            mensaje.rate = 1.0; // Velocidad normal
-            mensaje.pitch = 1.0; // Tono normal
-
+            mensaje.rate = 1.1; 
             window.speechSynthesis.speak(mensaje);
         }
     </script>
