@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Gemini Car AA Stable</title>
+<title>Gemini Car v16 AA Fix</title>
 
 <style>
 body {
@@ -18,12 +18,11 @@ body {
     background: #8e75ff;
     color: white;
     border: none;
-    padding: 25px;
-    border-radius: 20px;
-    font-size: 1.5rem;
+    padding: 35px;
+    border-radius: 30px;
+    font-size: 2rem;
     font-weight: bold;
     width: 95%;
-    margin-top: 10px;
 }
 
 #info {
@@ -31,29 +30,17 @@ body {
     padding: 15px;
     background: #111;
     border-radius: 10px;
-    min-height: 80px;
+    font-size: 0.9rem;
     color: #8e75ff;
+    min-height: 100px;
     border: 1px solid #333;
-}
-
-input {
-    width: 95%;
-    padding: 15px;
-    font-size: 1.2rem;
-    border-radius: 10px;
-    border: none;
-    margin-top: 10px;
 }
 </style>
 </head>
 
 <body>
 
-<h3>Gemini Car AA</h3>
-
-<input id="texto" placeholder="Escribe aquí o usa voz del teclado">
-
-<button class="btn-lila" onclick="enviar()">🚗 ENVIAR</button>
+<button class="btn-lila" onclick="run()">✨ HABLAR AHORA</button>
 
 <div id="info">Estado: Listo</div>
 
@@ -61,47 +48,92 @@ input {
 
 const WORKER_URL = "https://shy-bird-e0a6.merlu17.workers.dev/";
 
-async function enviar() {
+// SpeechRecognition
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
-    const texto = document.getElementById("texto").value;
+let rec = null;
 
-    if (!texto) {
-        document.getElementById("info").innerText = "Escribe algo primero";
+if (SpeechRecognition) {
+    rec = new SpeechRecognition();
+    rec.lang = "es-ES";
+    rec.interimResults = false;
+    rec.maxAlternatives = 1;
+
+    rec.onresult = async function(event) {
+
+        const texto = event.results[0][0].transcript;
+        const caja = document.getElementById("info");
+
+        caja.innerText = "🧠 Pensando: " + texto;
+
+        try {
+
+            const response = await fetch(WORKER_URL, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    contents: [{
+                        parts: [{
+                            text: texto
+                        }]
+                    }]
+                })
+            });
+
+            const data = await response.json();
+
+            const respuesta =
+            data.candidates?.[0]?.content?.parts?.[0]?.text
+            || "Sin respuesta";
+
+            caja.innerText = respuesta;
+
+            hablar(respuesta);
+
+        } catch (error) {
+            caja.innerText = "❌ Error: " + error;
+        }
+    };
+
+    rec.onerror = function(e) {
+        document.getElementById("info").innerText =
+        "❌ Error micrófono: " + e.error;
+    };
+}
+
+function run() {
+
+    if (!rec) {
+        alert("Este navegador no soporta voz");
         return;
     }
 
-    const caja = document.getElementById("info");
-    caja.innerText = "🧠 Pensando: " + texto;
+    window.speechSynthesis.cancel();
 
-    try {
+    const voz = new SpeechSynthesisUtterance("Te escucho");
+    voz.lang = "es-ES";
 
-        const response = await fetch(WORKER_URL, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                contents: [{
-                    parts: [{
-                        text: texto
-                    }]
-                }]
-            })
-        });
+    window.speechSynthesis.speak(voz);
 
-        const data = await response.json();
+    voz.onend = () => {
 
-        const respuesta =
-        data.candidates?.[0]?.content?.parts?.[0]?.text
-        || "Sin respuesta";
+        try {
 
-        caja.innerText = respuesta;
+            rec.stop(); // 🔧 FIX AA Browser
 
-        hablar(respuesta);
+            setTimeout(() => {
+                rec.start();
+                document.getElementById("info").innerText =
+                "🎤 Escuchando...";
+            }, 300);
 
-    } catch (e) {
-        caja.innerText = "❌ Error: " + e;
-    }
+        } catch (e) {
+            document.getElementById("info").innerText =
+            "❌ Error micro: " + e;
+        }
+    };
 }
 
 function hablar(texto) {
@@ -111,6 +143,9 @@ function hablar(texto) {
 
     window.speechSynthesis.speak(voz);
 
+    voz.onend = () => {
+        document.getElementById("info").innerText = "✅ Listo";
+    };
 }
 
 </script>
