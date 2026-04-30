@@ -1,4 +1,5 @@
 <!DOCTYPE html><html lang="es">
+
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -12,34 +13,33 @@ body {
 }
 
 .btn-lila {
-    background: #8e75ff;
-    color: white;
-    border: none;
-    padding: 35px;
-    border-radius: 30px;
-    font-size: 2rem;
-    font-weight: bold;
-    width: 95%;
+background: #8e75ff;
+color: white;
+border: none;
+padding: 35px;
+border-radius: 30px;
+font-size: 2rem;
+font-weight: bold;
+width: 95%;
 }
 
 #info {
-    margin-top: 20px;
-    padding: 15px;
-    background: #111;
-    border-radius: 10px;
-    font-size: 0.9rem;
-    color: #8e75ff;
-    min-height: 100px;
-    border: 1px solid #333;
-}
-</style></head><body><button class="btn-lila" onclick="run()">✨ HABLAR AHORA</button>
+margin-top: 20px;
+padding: 15px;
+background: #111;
+border-radius: 10px;
+font-size: 0.9rem;
+color: #8e75ff;
+min-height: 100px;
+border: 1px solid #333;
+} </style></head><body><button class="btn-lila" onclick="run()">✨ HABLAR AHORA</button>
 
 <div id="info">
 Estado: Listo
 </div><script>
 
-// TU API KEY (la que usaste en curl)
-const API_KEY = "AIzaSyBBfJgTfk6vtBUqMZEgROCG4mKBgzZTpZg";
+// 🔗 TU WORKER (en vez de API KEY)
+const WORKER_URL = "https://shy-bird-e0a6.merlu17.workers.dev/";
 
 const SpeechRecognition =
 window.SpeechRecognition ||
@@ -50,105 +50,113 @@ rec.lang = "es-ES";
 
 function run() {
 
-    window.speechSynthesis.cancel();
+```
+window.speechSynthesis.cancel();
 
-    const voz =
-    new SpeechSynthesisUtterance("Te escucho");
+const voz =
+new SpeechSynthesisUtterance("Te escucho");
 
-    voz.lang = "es-ES";
+voz.lang = "es-ES";
 
-    window.speechSynthesis.speak(voz);
+window.speechSynthesis.speak(voz);
 
-    voz.onend = () => {
+voz.onend = () => {
 
-        rec.start();
+    rec.start();
 
-        document.getElementById("info").innerText =
-        "🎤 Escuchando...";
+    document.getElementById("info").innerText =
+    "🎤 Escuchando...";
 
-    };
+};
+```
 
 }
 
 rec.onresult = async function(event) {
 
-    const texto =
-    event.results[0][0].transcript;
+```
+const texto =
+event.results[0][0].transcript;
 
-    const caja =
-    document.getElementById("info");
+const caja =
+document.getElementById("info");
+
+caja.innerText =
+"🧠 Pensando: " + texto;
+
+try {
+
+    const response = await fetch(
+```
+
+WORKER_URL,
+{
+method: "POST",
+
+```
+        headers: {
+            "Content-Type": "application/json"
+        },
+
+        body: JSON.stringify({
+            contents: [{
+                parts: [{
+                    text: texto
+                }]
+            }]
+        })
+
+    });
+
+    const data = await response.json();
+
+    if (data.error) {
+
+        caja.innerHTML =
+        "<b style='color:red'>ERROR:</b><br>" +
+        data.error;
+
+        return;
+    }
+
+    const respuesta =
+    data.candidates[0]
+    .content.parts[0].text;
+
+    hablar(respuesta);
+
+}
+
+catch (error) {
 
     caja.innerText =
-    "🧠 Pensando: " + texto;
+    "❌ Error conexión: " + error;
 
-    try {
-
-        const response = await fetch(
-"https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent",
-        {
-            method: "POST",
-
-            headers: {
-                "Content-Type": "application/json",
-                "X-goog-api-key": API_KEY
-            },
-
-            body: JSON.stringify({
-                contents: [{
-                    parts: [{
-                        text: texto
-                    }]
-                }]
-            })
-
-        });
-
-        const data = await response.json();
-
-        if (data.error) {
-
-            caja.innerHTML =
-            "<b style='color:red'>ERROR:</b><br>" +
-            "Código: " + data.error.code +
-            "<br>Mensaje: " + data.error.message;
-
-            return;
-        }
-
-        const respuesta =
-        data.candidates[0]
-        .content.parts[0].text;
-
-        hablar(respuesta);
-
-    }
-
-    catch (error) {
-
-        caja.innerText =
-        "❌ Error conexión: " + error;
-
-    }
+}
+```
 
 };
 
 function hablar(texto) {
 
-    const voz =
-    new SpeechSynthesisUtterance(texto);
+```
+const voz =
+new SpeechSynthesisUtterance(texto);
 
-    voz.lang = "es-ES";
+voz.lang = "es-ES";
 
-    window.speechSynthesis.speak(voz);
+window.speechSynthesis.speak(voz);
 
-    voz.onend = () => {
+voz.onend = () => {
 
-        document.getElementById("info").innerText =
-        "✅ Listo";
+    document.getElementById("info").innerText =
+    "✅ Listo";
 
-    };
+};
+```
 
 }
 
 </script></body>
+
 </html>
