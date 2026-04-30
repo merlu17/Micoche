@@ -1,154 +1,147 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Gemini Car v16 AA Fix</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gemini Car v16 AA Fix</title>
 
-<style>
-body {
-    background: #000;
-    color: #fff;
-    font-family: sans-serif;
-    text-align: center;
-    padding: 20px;
-}
+    <style>
+        body {
+            background: #000;
+            color: #fff;
+            font-family: sans-serif;
+            text-align: center;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 90vh;
+            margin: 0;
+        }
 
-.btn-lila {
-    background: #8e75ff;
-    color: white;
-    border: none;
-    padding: 35px;
-    border-radius: 30px;
-    font-size: 2rem;
-    font-weight: bold;
-    width: 95%;
-}
+        .btn-lila {
+            background: #8e75ff;
+            color: white;
+            border: none;
+            padding: 35px;
+            border-radius: 30px;
+            font-size: 2rem;
+            font-weight: bold;
+            width: 95%;
+            cursor: pointer;
+            transition: transform 0.1s;
+            box-shadow: 0 10px 20px rgba(142, 117, 255, 0.3);
+        }
 
-#info {
-    margin-top: 20px;
-    padding: 15px;
-    background: #111;
-    border-radius: 10px;
-    font-size: 0.9rem;
-    color: #8e75ff;
-    min-height: 100px;
-    border: 1px solid #333;
-}
-</style>
+        .btn-lila:active {
+            transform: scale(0.95);
+            background: #7a62e6;
+        }
+
+        #info {
+            margin-top: 30px;
+            padding: 20px;
+            background: #111;
+            border-radius: 15px;
+            font-size: 1.1rem;
+            color: #8e75ff;
+            width: 85%;
+            min-height: 120px;
+            border: 1px solid #333;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            line-height: 1.4;
+        }
+    </style>
 </head>
 
 <body>
 
-<button class="btn-lila" onclick="run()">✨ HABLAR AHORA</button>
+    <button class="btn-lila" onclick="run()">✨ HABLAR AHORA</button>
 
-<div id="info">Estado: Listo</div>
+    <div id="info">Estado: Listo</div>
 
-<script>
+    <script>
+        const WORKER_URL = "https://shy-bird-e0a6.merlu17.workers.dev/";
 
-const WORKER_URL = "https://shy-bird-e0a6.merlu17.workers.dev/";
+        // Configuración de Reconocimiento de Voz
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        let rec = null;
 
-// SpeechRecognition
-const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (SpeechRecognition) {
+            rec = new SpeechRecognition();
+            rec.lang = "es-ES";
+            rec.interimResults = false;
+            rec.maxAlternatives = 1;
 
-let rec = null;
+            rec.onresult = async function(event) {
+                const texto = event.results[0][0].transcript;
+                const caja = document.getElementById("info");
 
-if (SpeechRecognition) {
-    rec = new SpeechRecognition();
-    rec.lang = "es-ES";
-    rec.interimResults = false;
-    rec.maxAlternatives = 1;
+                caja.innerText = "🧠 Pensando: " + texto;
 
-    rec.onresult = async function(event) {
+                try {
+                    const response = await fetch(WORKER_URL, {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify({
+                            contents: [{
+                                parts: [{
+                                    text: texto
+                                }]
+                            }]
+                        })
+                    });
 
-        const texto = event.results[0][0].transcript;
-        const caja = document.getElementById("info");
+                    const data = await response.json();
+                    const respuesta = data.candidates?.[0]?.content?.parts?.[0]?.text || "No recibí respuesta.";
 
-        caja.innerText = "🧠 Pensando: " + texto;
+                    caja.innerText = respuesta;
+                    hablar(respuesta);
 
-        try {
+                } catch (error) {
+                    caja.innerText = "❌ Error en la conexión: " + error.message;
+                    hablar("Lo siento, hubo un error de conexión.");
+                }
+            };
 
-            const response = await fetch(WORKER_URL, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                    contents: [{
-                        parts: [{
-                            text: texto
-                        }]
-                    }]
-                })
-            });
+            rec.onerror = function(e) {
+                document.getElementById("info").innerText = "❌ Error micrófono: " + e.error;
+            };
 
-            const data = await response.json();
-
-            const respuesta =
-            data.candidates?.[0]?.content?.parts?.[0]?.text
-            || "Sin respuesta";
-
-            caja.innerText = respuesta;
-
-            hablar(respuesta);
-
-        } catch (error) {
-            caja.innerText = "❌ Error: " + error;
+            rec.onend = function() {
+                // Se detuvo la escucha
+            };
         }
-    };
 
-    rec.onerror = function(e) {
-        document.getElementById("info").innerText =
-        "❌ Error micrófono: " + e.error;
-    };
-}
-
-function run() {
-
-    if (!rec) {
-        alert("Este navegador no soporta voz");
-        return;
-    }
-
-    window.speechSynthesis.cancel();
-
-    const voz = new SpeechSynthesisUtterance("Te escucho");
-    voz.lang = "es-ES";
-
-    window.speechSynthesis.speak(voz);
-
-    voz.onend = () => {
-
-        try {
-
-            rec.stop(); // 🔧 FIX AA Browser
-
-            setTimeout(() => {
+        // Función para iniciar la escucha
+        function run() {
+            if (rec) {
+                // Detener cualquier voz que esté hablando antes de escuchar
+                window.speechSynthesis.cancel();
+                document.getElementById("info").innerText = "🎤 Escuchando...";
                 rec.start();
-                document.getElementById("info").innerText =
-                "🎤 Escuchando...";
-            }, 300);
-
-        } catch (e) {
-            document.getElementById("info").innerText =
-            "❌ Error micro: " + e;
+            } else {
+                alert("Tu navegador o dispositivo no soporta el reconocimiento de voz.");
+            }
         }
-    };
-}
 
-function hablar(texto) {
+        // Función para que la IA hable
+        function hablar(texto) {
+            // Limpiar Markdown (asteriscos, almohadillas, etc.) para que la voz sea fluida
+            const textoLimpio = texto.replace(/[*#_~]/g, '');
+            
+            const mensaje = new SpeechSynthesisUtterance(textoLimpio);
+            mensaje.lang = "es-ES";
+            mensaje.rate = 1.0; // Velocidad normal
+            mensaje.pitch = 1.0; // Tono normal
 
-    const voz = new SpeechSynthesisUtterance(texto);
-    voz.lang = "es-ES";
-
-    window.speechSynthesis.speak(voz);
-
-    voz.onend = () => {
-        document.getElementById("info").innerText = "✅ Listo";
-    };
-}
-
-</script>
-
+            window.speechSynthesis.speak(mensaje);
+        }
+    </script>
 </body>
 </html>
