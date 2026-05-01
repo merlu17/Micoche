@@ -3,161 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gemini Car v17 - Gemini 3</title>
+    <title>Mi Panel de Coche</title>
     <style>
-        body {
-            background: #000;
-            color: #fff;
-            font-family: sans-serif;
-            text-align: center;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 90vh;
-            margin: 0;
+        body { font-family: sans-serif; background: #121212; color: white; text-align: center; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; padding: 20px; }
+        .boton { 
+            background: #1a73e8; color: white; padding: 05vh 02vh; 
+            text-decoration: none; border-radius: 15px; font-size: 24px; font-weight: bold;
         }
-        .btn-lila {
-            background: #8e75ff;
-            color: white;
-            border: none;
-            padding: 45px;
-            border-radius: 40px;
-            font-size: 2.2rem;
-            font-weight: bold;
-            width: 95%;
-            box-shadow: 0 0 20px rgba(142, 117, 255, 0.4);
-            cursor: pointer;
-            transition: transform 0.1s;
-        }
-        .btn-lila:active {
-            transform: scale(0.95);
-            background: #7a62e6;
-        }
-        #info {
-            margin-top: 30px;
-            padding: 20px;
-            background: #111;
-            border-radius: 15px;
-            font-size: 1.1rem;
-            color: #8e75ff;
-            width: 85%;
-            min-height: 80px;
-            border: 1px solid #333;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
+        .boton:active { background: #1557b0; }
     </style>
 </head>
 <body>
-
-    <button class="btn-lila" onclick="run()">✨ HABLAR AHORA</button>
-
-    <div id="info">Estado: Listo para Gemini 3</div>
-
-<script>
-// 1. CONFIGURACIÓN
-const WORKER_URL = "https://shy-bird-e0a6.merlu17.workers.dev/";
-const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-let rec = null;
-
-if (!SpeechRecognition) {
-    document.getElementById("info").innerText = "❌ Navegador no compatible con voz";
-} else {
-    rec = new SpeechRecognition();
-    rec.lang = "es-ES";
-    rec.continuous = false;
-    rec.interimResults = false;
-
-    rec.onresult = async function(event) {
-        const texto = event.results[0][0].transcript;
-        const caja = document.getElementById("info");
-        caja.innerText = "🧠 Gemini 3 pensando...";
-
-        try {
-            const response = await fetch(WORKER_URL, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    contents: [{
-                        parts: [{
-                            text: "Respuesta corta para coche: " + texto
-                        }]
-                    }]
-                })
-            });
-
-            const data = await response.json();
-            
-            if (data.error) {
-                caja.innerText = "❌ Error de cuota o API";
-                return;
-            }
-
-            const respuesta = data.candidates?.[0]?.content?.parts?.[0]?.text || "Sin respuesta";
-            hablar(respuesta);
-
-        } catch (error) {
-            caja.innerText = "❌ Error de conexión";
-        }
-    };
-
-    rec.onerror = (e) => {
-        document.getElementById("info").innerText = "❌ Error micro: " + e.error;
-        console.error(e);
-    };
-}
-
-// 2. FUNCIÓN PRINCIPAL
-async function run() {
-    if (!rec) return;
-
-    const caja = document.getElementById("info");
-    window.speechSynthesis.cancel(); // Silenciar si estaba hablando
-
-    // PASO CRÍTICO: "Despertar" el hardware del micro con una promesa de medios
-    try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        stream.getTracks().forEach(track => track.stop()); // Solo queremos abrir el canal
-    } catch (e) {
-        caja.innerText = "❌ Micro bloqueado por el navegador";
-        return;
-    }
-
-    // Feedback sonoro antes de escuchar
-    const aviso = new SpeechSynthesisUtterance("Dime");
-    aviso.lang = "es-ES";
-    window.speechSynthesis.speak(aviso);
-
-    aviso.onend = () => {
-        try {
-            // Pequeño delay para que no se escuche a sí mismo
-            setTimeout(() => {
-                rec.start();
-                caja.innerText = "🎤 ESCUCHANDO...";
-            }, 400);
-        } catch (e) {
-            caja.innerText = "❌ Reintenta pulsar";
-        }
-    };
-}
-
-// 3. FUNCIÓN DE SALIDA DE VOZ
-function hablar(texto) {
-    const caja = document.getElementById("info");
-    caja.innerText = "🗣️ Gemini 3 respondiendo...";
-    
-    const voz = new SpeechSynthesisUtterance(texto);
-    voz.lang = "es-ES";
-    
-    window.speechSynthesis.speak(voz);
-    
-    voz.onend = () => {
-        caja.innerText = "✅ Listo";
-    };
-}
-</script>
+    <h1>Mis Accesos Rápidos</h1>
+    <div class="grid">
+        <a href="https://www.youtube.com" class="boton">YouTube</a>
+        <a href="https://www.google.es" class="boton">Google</a>
+        <a href="https://www.reddit.com" class="boton">Reddit</a>
+        <a href="https://www.eltiempo.es" class="boton">El Tiempo</a>
+        <a href="https://gemini.google.com/app?hl=es-ES" class="boton" style="background: #8e75ff;">Gemini</a>
+    </div>
 </body>
 </html>
