@@ -3,17 +3,77 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gemini Car v16</title>
+    <title>Gemini Car v16 AA Fix</title>
     <style>
-        body { background: #000; color: #fff; font-family: sans-serif; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-        .btn-lila { background: #8e75ff; color: white; border: none; padding: 40px; border-radius: 30px; font-size: 2rem; font-weight: bold; width: 90%; cursor: pointer; }
-        .listening { background: #ff4b4b !important; }
-        #info { margin-top: 20px; padding: 20px; background: #111; border-radius: 15px; width: 80%; min-height: 100px; color: #8e75ff; border: 1px solid #333; font-size: 1.1rem; }
+        body {
+            background: #000;
+            color: #fff;
+            font-family: sans-serif;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        .btn-lila {
+            background: #8e75ff;
+            color: white;
+            border: none;
+            padding: 45px;
+            border-radius: 35px;
+            font-size: 2.2rem;
+            font-weight: bold;
+            width: 92%;
+            max-width: 500px;
+            cursor: pointer;
+            transition: 0.2s;
+            box-shadow: 0 10px 25px rgba(142, 117, 255, 0.4);
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .btn-lila:active {
+            transform: scale(0.95);
+            background: #a38fff;
+        }
+
+        .listening {
+            background: #ff4b4b !important;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(255, 75, 75, 0.7); }
+            70% { box-shadow: 0 0 0 25px rgba(255, 75, 75, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 75, 75, 0); }
+        }
+
+        #info {
+            margin-top: 25px;
+            padding: 20px;
+            background: #111;
+            border-radius: 20px;
+            width: 85%;
+            max-width: 500px;
+            min-height: 140px;
+            color: #8e75ff;
+            border: 1px solid #333;
+            font-size: 1.3rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow-y: auto;
+            line-height: 1.4;
+        }
     </style>
 </head>
 <body>
 
     <button id="btn" class="btn-lila" onclick="run()">✨ HABLAR AHORA</button>
+
     <div id="info">Estado: Listo</div>
 
     <script>
@@ -21,17 +81,38 @@
         const btn = document.getElementById("btn");
         const caja = document.getElementById("info");
 
-        // Intentar todas las variantes de Speech API
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition || window.mozSpeechRecognition || window.msSpeechRecognition;
+        // Soporte multinavergado para SpeechRecognition
+        const SpeechRecognition = window.SpeechRecognition || 
+                                  window.webkitSpeechRecognition || 
+                                  window.mozSpeechRecognition || 
+                                  window.msSpeechRecognition;
         let rec = null;
 
         if (SpeechRecognition) {
             rec = new SpeechRecognition();
             rec.lang = "es-ES";
-            rec.onstart = () => { btn.classList.add("listening"); btn.innerText = "🎤 ESCUCHANDO..."; };
-            rec.onresult = (e) => procesar(e.results[0][0].transcript);
-            rec.onerror = (e) => { caja.innerText = "❌ Error Micro: " + e.error; resetBtn(); };
-            rec.onend = () => resetBtn();
+            rec.continuous = false;
+            rec.interimResults = false;
+
+            rec.onstart = () => {
+                btn.classList.add("listening");
+                btn.innerText = "🎤 ESCUCHANDO...";
+                caja.innerText = "Te escucho, dime algo...";
+            };
+
+            rec.onresult = (event) => {
+                const texto = event.results[0][0].transcript;
+                procesar(texto);
+            };
+
+            rec.onerror = (e) => {
+                caja.innerText = "❌ Error Micro: " + e.error;
+                resetBtn();
+            };
+
+            rec.onend = () => {
+                resetBtn();
+            };
         }
 
         function resetBtn() {
@@ -40,43 +121,67 @@
         }
 
         async function run() {
+            // Cancelar voces previas antes de escuchar
             window.speechSynthesis.cancel();
-            if (!rec) { caja.innerText = "❌ Navegador no compatible"; return; }
-            try { rec.start(); } catch(e) { console.log(e); }
-        }
 
-        async function procesar(texto) {
-            caja.innerText = "🧠 Pensando: " + texto;
-            btn.innerText = "⏳ PROCESANDO...";
+            if (!rec) {
+                caja.innerText = "❌ Tu navegador no soporta voz.";
+                return;
+            }
 
             try {
-                const res = await fetch(WORKER_URL, {
+                rec.start();
+            } catch (e) {
+                console.log("Reconocimiento ya en marcha");
+            }
+        }
+
+        async function procesar(textoUsuario) {
+            btn.innerText = "⏳ PENSANDO...";
+            caja.innerText = "🧠 Pensando: " + textoUsuario;
+
+            try {
+                const response = await fetch(WORKER_URL, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ contents: [{ parts: [{ text: texto }] }] })
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: textoUsuario }] }]
+                    })
                 });
 
-                if (!res.ok) {
-                    const errorText = await res.text();
-                    throw new Error("Worker falló: " + errorText);
+                const data = await response.json();
+
+                // Manejo de errores específicos del Worker o de Google
+                if (data.error_ia) {
+                    caja.innerText = "❌ Error Google: " + data.error_ia;
+                } 
+                else if (data.candidates && data.candidates[0]?.content?.parts?.[0]?.text) {
+                    const respuestaIA = data.candidates[0].content.parts[0].text;
+                    caja.innerText = respuestaIA;
+                    hablar(respuestaIA);
+                } 
+                else {
+                    // Si no encontramos el texto, mostramos la respuesta para depurar
+                    caja.innerText = "❌ Estructura desconocida: " + JSON.stringify(data).substring(0, 100);
                 }
 
-                const data = await res.json();
-                const respuestaIA = data.candidates[0].content.parts[0].text;
-                
-                caja.innerText = respuestaIA;
-                hablar(respuestaIA);
-            } catch (err) {
-                caja.innerText = "❌ Error al procesar: " + err.message;
+            } catch (error) {
+                caja.innerText = "❌ Error de conexión: " + error.message;
             } finally {
                 resetBtn();
             }
         }
 
-        function hablar(t) {
-            const msg = new SpeechSynthesisUtterance(t.replace(/[*#_~-]/g, ''));
-            msg.lang = "es-ES";
-            window.speechSynthesis.speak(msg);
+        function hablar(texto) {
+            // Limpieza profunda de Markdown para que la voz no lea símbolos
+            const textoLimpio = texto.replace(/[*#_~-]/g, '');
+            
+            const mensaje = new SpeechSynthesisUtterance(textoLimpio);
+            mensaje.lang = "es-ES";
+            mensaje.rate = 1.0; 
+            mensaje.pitch = 1.0;
+
+            window.speechSynthesis.speak(mensaje);
         }
     </script>
 </body>
