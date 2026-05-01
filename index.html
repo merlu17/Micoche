@@ -3,78 +3,83 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gemini Car v16 Fix</title>
+    <title>Gemini Car v16</title>
     <style>
         body { background: #000; color: #fff; font-family: sans-serif; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-        .btn-lila { background: #8e75ff; color: white; border: none; padding: 40px; border-radius: 30px; font-size: 2rem; font-weight: bold; width: 90%; cursor: pointer; }
-        .recording { background: #ff4b4b !important; animation: pulse 1s infinite; }
-        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(255, 75, 75, 0.7); } 70% { box-shadow: 0 0 0 20px rgba(255, 75, 75, 0); } 100% { box-shadow: 0 0 0 0 rgba(255, 75, 75, 0); } }
-        #info { margin-top: 20px; padding: 20px; background: #111; border-radius: 15px; width: 80%; min-height: 100px; color: #8e75ff; border: 1px solid #333; }
+        .btn-lila { background: #8e75ff; color: white; border: none; padding: 45px; border-radius: 35px; font-size: 2.2rem; font-weight: bold; width: 92%; cursor: pointer; transition: 0.2s; box-shadow: 0 8px 15px rgba(142,117,255,0.4); }
+        .btn-lila:active { transform: scale(0.95); background: #a38fff; }
+        .listening { background: #ff4b4b !important; animation: blink 1s infinite; }
+        @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
+        #info { margin-top: 25px; padding: 20px; background: #111; border-radius: 20px; width: 85%; min-height: 130px; color: #8e75ff; border: 1px solid #333; font-size: 1.3rem; display: flex; align-items: center; justify-content: center; }
     </style>
 </head>
 <body>
 
-<button id="btn" class="btn-lila" onclick="toggleRegistro()">✨ HABLAR</button>
-<div id="info">Estado: Listo</div>
+    <button id="btn" class="btn-lila" onclick="run()">✨ HABLAR</button>
+    <div id="info">Listo</div>
 
-<script>
-    let mediaRecorder;
-    let audioChunks = [];
-    const btn = document.getElementById("btn");
-    const caja = document.getElementById("info");
+    <script>
+        const WORKER_URL = "https://shy-bird-e0a6.merlu17.workers.dev/";
+        const btn = document.getElementById("btn");
+        const caja = document.getElementById("info");
 
-    async function toggleRegistro() {
-        if (mediaRecorder && mediaRecorder.state === "recording") {
-            mediaRecorder.stop();
-            btn.classList.remove("recording");
-            btn.innerText = "⏳ PROCESANDO...";
-            return;
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        let rec = null;
+
+        if (SpeechRecognition) {
+            rec = new SpeechRecognition();
+            rec.lang = "es-ES";
+            rec.onstart = () => { 
+                btn.classList.add("listening"); 
+                btn.innerText = "🎤 ESCUCHANDO...";
+                caja.innerText = "Dime algo...";
+            };
+            rec.onresult = (e) => procesar(e.results[0][0].transcript);
+            rec.onerror = (e) => { caja.innerText = "Error: " + e.error; resetBtn(); };
+            rec.onend = () => resetBtn();
         }
 
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            mediaRecorder = new MediaRecorder(stream);
-            audioChunks = [];
-
-            mediaRecorder.ondataavailable = (event) => {
-                audioChunks.push(event.data);
-            };
-
-            mediaRecorder.onstop = async () => {
-                const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-                caja.innerText = "🧠 Enviando audio a Gemini...";
-                // Aquí enviarías el audio al Worker
-                enviarAudio(audioBlob);
-            };
-
-            mediaRecorder.start();
-            btn.classList.add("recording");
-            btn.innerText = "🛑 DETENER";
-            caja.innerText = "Escuchando... pulsa para terminar.";
-
-        } catch (err) {
-            caja.innerText = "❌ Error: " + err.message;
+        function resetBtn() {
+            btn.classList.remove("listening");
+            btn.innerText = "✨ HABLAR";
         }
-    }
 
-    async function enviarAudio(blob) {
-        // NOTA: Tu worker actual espera TEXTO. 
-        // Si no puedes cambiar el worker a transcripción de audio,
-        // intentemos forzar el reconocimiento nativo una última vez con este parche:
-        forzarReconocimientoNativo();
-    }
+        async function run() {
+            window.speechSynthesis.cancel();
+            if (!rec) return alert("Micro no soportado");
+            try { rec.start(); } catch(e) {}
+        }
 
-    function forzarReconocimientoNativo() {
-        const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-        recognition.lang = "es-ES";
-        recognition.onstart = () => { console.log("Iniciado"); };
-        recognition.onresult = (event) => {
-            const texto = event.results[0][0].transcript;
-            caja.innerText = "Texto: " + texto;
-            // llamar a tu función de fetch aquí
-        };
-        recognition.start();
-    }
-</script>
+        async function procesar(texto) {
+            btn.innerText = "⏳ PENSANDO...";
+            caja.innerText = "🧠: " + texto;
+
+            try {
+                const res = await fetch(WORKER_URL, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ contents: [{ parts: [{ text: texto }] }] })
+                });
+
+                const data = await res.json();
+                
+                // Navegamos el JSON exacto que enviaste
+                const respuestaIA = data.candidates[0].content.parts[0].text;
+                
+                caja.innerText = respuestaIA;
+                hablar(respuestaIA);
+            } catch (err) {
+                caja.innerText = "❌ Error al procesar";
+            } finally {
+                resetBtn();
+            }
+        }
+
+        function hablar(t) {
+            const msg = new SpeechSynthesisUtterance(t.replace(/[*#_~-]/g, ''));
+            msg.lang = "es-ES";
+            window.speechSynthesis.speak(msg);
+        }
+    </script>
 </body>
 </html>
