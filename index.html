@@ -1,78 +1,121 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gemini Car v16</title>
-    <style>
-        body { background: #000; color: #fff; font-family: sans-serif; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; overflow: hidden; }
-        .btn-lila { background: #8e75ff; color: white; border: none; padding: 45px; border-radius: 35px; font-size: 2.2rem; font-weight: bold; width: 92%; max-width: 500px; cursor: pointer; box-shadow: 0 10px 25px rgba(142, 117, 255, 0.4); }
-        .listening { background: #ff4b4b !important; animation: pulse 1s infinite; }
-        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(255, 75, 75, 0.7); } 70% { box-shadow: 0 0 0 25px rgba(255, 75, 75, 0); } 100% { box-shadow: 0 0 0 0 rgba(255, 75, 75, 0); } }
-        #info { margin-top: 25px; padding: 20px; background: #111; border-radius: 20px; width: 85%; max-width: 500px; min-height: 140px; color: #8e75ff; border: 1px solid #333; font-size: 1.3rem; display: flex; align-items: center; justify-content: center; overflow-y: auto; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gemini Car PRO</title>
+
+<style>
+body {
+    background: #000;
+    color: #fff;
+    font-family: sans-serif;
+    text-align: center;
+    padding: 20px;
+}
+
+input {
+    width: 95%;
+    padding: 20px;
+    font-size: 1.3rem;
+    border-radius: 15px;
+    border: none;
+    margin-top: 20px;
+}
+
+button {
+    background: #8e75ff;
+    color: white;
+    border: none;
+    padding: 30px;
+    border-radius: 25px;
+    font-size: 2rem;
+    font-weight: bold;
+    width: 95%;
+    margin-top: 20px;
+}
+
+#info {
+    margin-top: 20px;
+    padding: 15px;
+    background: #111;
+    border-radius: 10px;
+    min-height: 120px;
+    color: #8e75ff;
+    border: 1px solid #333;
+}
+</style>
 </head>
+
 <body>
 
-    <button id="btn" class="btn-lila" onclick="run()">✨ HABLAR AHORA</button>
-    <div id="info">Estado: Listo</div>
+<h2>🚗 Gemini Car PRO</h2>
 
-    <script>
-        const WORKER_URL = "https://shy-bird-e0a6.merlu17.workers.dev/";
-        const btn = document.getElementById("btn");
-        const caja = document.getElementById("info");
+<!-- 🎤 AQUÍ VA EL DICTADO DEL SISTEMA -->
+<input id="texto" placeholder="Pulsa 🎤 del teclado y habla">
 
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        let rec = null;
+<button onclick="enviar()">ENVIAR 🚀</button>
 
-        if (SpeechRecognition) {
-            rec = new SpeechRecognition();
-            rec.lang = "es-ES";
-            rec.onstart = () => { btn.classList.add("listening"); btn.innerText = "🎤 ESCUCHANDO..."; };
-            rec.onresult = (e) => procesar(e.results[0][0].transcript);
-            rec.onerror = (e) => { caja.innerText = "❌ Error Micro: " + e.error; resetBtn(); };
-            rec.onend = () => resetBtn();
-        }
+<div id="info">Estado: listo</div>
 
-        function resetBtn() {
-            btn.classList.remove("listening");
-            btn.innerText = "✨ HABLAR AHORA";
-        }
+<script>
 
-        async function run() {
-            window.speechSynthesis.cancel();
-            if (!rec) { caja.innerText = "❌ Navegador no compatible"; return; }
-            try { rec.start(); } catch(e) {}
-        }
+const WORKER_URL = "https://shy-bird-e0a6.merlu17.workers.dev/";
 
-        async function procesar(texto) {
-            caja.innerText = "🧠 Pensando...";
-            btn.innerText = "⏳...";
-            try {
-                const res = await fetch(WORKER_URL, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ contents: [{ parts: [{ text: texto }] }] })
-                });
-                const data = await res.json();
-                
-                // Buscamos el texto en la respuesta
-                const respuestaIA = data.candidates?.[0]?.content?.parts?.[0]?.text || "No recibí respuesta de la IA";
-                
-                caja.innerText = respuestaIA;
-                hablar(respuestaIA);
-            } catch (err) {
-                caja.innerText = "❌ Error: " + err.message;
-            } finally {
-                resetBtn();
-            }
-        }
+async function enviar() {
 
-        function hablar(t) {
-            const msg = new SpeechSynthesisUtterance(t.replace(/[*#_~-]/g, ''));
-            msg.lang = "es-ES";
-            window.speechSynthesis.speak(msg);
-        }
-    </script>
+    const texto = document.getElementById("texto").value;
+
+    if (!texto) {
+        document.getElementById("info").innerText =
+        "❌ Usa el micrófono del teclado 🎤";
+        return;
+    }
+
+    const caja = document.getElementById("info");
+    caja.innerText = "🧠 Pensando...";
+
+    try {
+
+        const response = await fetch(WORKER_URL, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                contents: [{
+                    parts: [{
+                        text: texto
+                    }]
+                }]
+            })
+        });
+
+        const data = await response.json();
+
+        const respuesta =
+        data.candidates?.[0]?.content?.parts?.[0]?.text
+        || "Sin respuesta";
+
+        caja.innerText = respuesta;
+
+        hablar(respuesta);
+
+    } catch (e) {
+        caja.innerText = "❌ Error: " + e;
+    }
+}
+
+function hablar(texto) {
+
+    const voz = new SpeechSynthesisUtterance(texto);
+    voz.lang = "es-ES";
+
+    window.speechSynthesis.speak(voz);
+
+}
+
+</script>
+
 </body>
 </html>
